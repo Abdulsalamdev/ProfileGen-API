@@ -5,6 +5,9 @@ const URL = process.env.MONGODB_URL;
 
 const connectDB = async () => {
   try {
+    if(!URL) {
+      throw new Error("MONGODB_URL is not defined in the env")
+    }
     const conn = await mongoose.connect(URL, {
     //   useNewUrlParser: true,
     //   useUnifiedTopology: true,
