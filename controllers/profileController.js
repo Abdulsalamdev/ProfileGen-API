@@ -1,6 +1,6 @@
 const axios = require("axios");
-const Profile = require("../model/Profile");
-const { v7: uuidv7 } = require("uuid");
+const Profile = require("../models/Profile");
+const { v7: uuidv7 } = require("uuid")
 
 // Helper: Age Group
 function getAgeGroup(age) {
@@ -142,39 +142,105 @@ exports.getProfile = async (req, res) => {
 
 exports.getAllProfiles = async (req, res) => {
   try {
-    let { gender, country_id, age_group } = req.query;
+    let {
+      gender,
+      age_group,
+      country_id,
+      min_age,
+      max_age,
+      min_gender_probability,
+      min_country_probability,
+      sort_by,
+      order,
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // ✅ Normalize
+    if (gender) gender = gender.toLowerCase();
+    if (age_group) age_group = age_group.toLowerCase();
+    if (country_id) country_id = country_id.toUpperCase();
+
+    // ✅ Validation
+    const isNumber = (v) => !isNaN(v);
+
+    if (
+      (min_age && !isNumber(min_age)) ||
+      (max_age && !isNumber(max_age)) ||
+      (min_gender_probability && !isNumber(min_gender_probability)) ||
+      (min_country_probability && !isNumber(min_country_probability))
+    ) {
+      return res.status(422).json({
+        status: "error",
+        message: "Invalid query parameters"
+      });
+    }
+
+    page = parseInt(page);
+    limit = Math.min(parseInt(limit), 50);
+
+    if (page < 1) page = 1;
+    if (limit < 1) limit = 10;
 
     let filter = {};
 
-    // Case-insensitive handling
-    if (gender) {
-      filter.gender = gender.toLowerCase();
+    if (gender) filter.gender = gender;
+    if (age_group) filter.age_group = age_group;
+    if (country_id) filter.country_id = country_id;
+
+    if (min_age || max_age) {
+      filter.age = {};
+      if (min_age) filter.age.$gte = Number(min_age);
+      if (max_age) filter.age.$lte = Number(max_age);
     }
 
-    if (country_id) {
-      filter.country_id = country_id.toUpperCase();
+    if (min_gender_probability) {
+      filter.gender_probability = { $gte: Number(min_gender_probability) };
     }
 
-    if (age_group) {
-      filter.age_group = age_group.toLowerCase();
+    if (min_country_probability) {
+      filter.country_probability = { $gte: Number(min_country_probability) };
     }
 
-    const profiles = await Profile.find(filter);
+    // ✅ Sorting
+    let sort = {};
+    const validSortFields = ["age", "created_at", "gender_probability"];
+    const validOrder = ["asc", "desc"];
 
-    // Format response 
-    const formatted = profiles.map(p => ({
-      id: p.id,
-      name: p.name,
-      gender: p.gender,
-      age: p.age,
-      age_group: p.age_group,
-      country_id: p.country_id
-    }));
+    if (sort_by) {
+      if (!validSortFields.includes(sort_by)) {
+        return res.status(422).json({
+          status: "error",
+          message: "Invalid query parameters"
+        });
+      }
+
+      if (order && !validOrder.includes(order)) {
+        return res.status(422).json({
+          status: "error",
+          message: "Invalid query parameters"
+        });
+      }
+
+      sort[sort_by] = order === "desc" ? -1 : 1;
+    } else {
+      sort.created_at = -1;
+    }
+
+    const total = await Profile.countDocuments(filter);
+
+    const data = await Profile.find(filter)
+      .sort(sort)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(); // ✅ performance boost
 
     return res.status(200).json({
       status: "success",
-      count: formatted.length,
-      data: formatted
+      page,
+      limit,
+      total,
+      data
     });
 
   } catch (error) {
@@ -185,7 +251,6 @@ exports.getAllProfiles = async (req, res) => {
     });
   }
 };
-
 exports.deleteProfile = async (req, res) => {
   try {
     const { id } = req.params;

@@ -1,231 +1,321 @@
-# NameInsight API 🚀
-
-A RESTful backend service that analyzes a given name using multiple external APIs, classifies the data, and stores it in a database.
-
----
+# 🚀 Backend Wizards Stage 2 — Intelligence Query Engine
 
 ## 📌 Overview
 
-This API accepts a name, retrieves data from three external services (gender, age, nationality), processes the information, and stores a structured profile. It also provides endpoints to manage and query stored profiles.
+This project is a **demographic intelligence API** built for Insighta Labs.
+It allows clients (marketing teams, analysts, product teams) to:
 
----
+* Store demographic profiles
+* Filter data with advanced query parameters
+* Sort and paginate results efficiently
+* Perform **natural language searches** (rule-based)
 
-## 🛠️ Tech Stack
+The system is built using:
 
-* Node.js
-* Express.js
+* Node.js (Express)
 * MongoDB (Mongoose)
-* Axios
-* UUID v7
+* REST API architecture
 
 ---
 
-## 🌍 External APIs
+## 🌐 Base URL
 
-* Genderize → predicts gender
-* Agify → estimates age
-* Nationalize → predicts nationality
-
----
-
-## ⚙️ Installation & Setup
-
-### 1. Clone Repository
-
-```bash
-git clone <your-repo-link>
-cd backend-stage1
 ```
-
-### 2. Install Dependencies
-
-```bash
-npm install
-```
-
-### 3. Environment Variables
-
-Create a `.env` file:
-
-```env
-MONGO_URI=your_mongodb_connection_string
-```
-
-Update your database config to use:
-
-```js
-mongoose.connect(process.env.MONGO_URI)
+https://your-api-url.com
 ```
 
 ---
 
-### 4. Run the Server
+# 📦 Data Model
 
-```bash
-npm run dev
-```
-
-Server will run at:
+Each profile follows this structure:
 
 ```
-http://localhost:3000
-```
-
----
-
-## 📡 API Endpoints
-
-### 🔹 Create Profile
-
-**POST** `/api/profiles`
-
-Request:
-
-```json
 {
-  "name": "ella"
-}
-```
-
-Response:
-
-```json
-{
-  "status": "success",
-  "data": {
-    "id": "uuid",
-    "name": "ella",
-    "gender": "female",
-    "gender_probability": 0.99,
-    "sample_size": 1234,
-    "age": 46,
-    "age_group": "adult",
-    "country_id": "US",
-    "country_probability": 0.85,
-    "created_at": "2026-04-01T12:00:00Z"
-  }
+  id: UUID v7,
+  name: String (unique),
+  gender: String,
+  gender_probability: Number,
+  age: Number,
+  age_group: String,
+  country_id: String,
+  country_name: String,
+  country_probability: Number,
+  created_at: ISO 8601 timestamp
 }
 ```
 
 ---
 
-### 🔹 Get Single Profile
+# 🧠 Core Features
 
-**GET** `/api/profiles/:id`
+## 1. Advanced Filtering, Sorting & Pagination
+
+### Endpoint
+
+```
+GET /api/profiles
+```
+
+### Supported Filters
+
+| Parameter               | Description                    |
+| ----------------------- | ------------------------------ |
+| gender                  | male / female                  |
+| age_group               | child, teenager, adult, senior |
+| country_id              | ISO country code (e.g., NG)    |
+| min_age                 | Minimum age                    |
+| max_age                 | Maximum age                    |
+| min_gender_probability  | Minimum gender confidence      |
+| min_country_probability | Minimum country confidence     |
 
 ---
 
-### 🔹 Get All Profiles
+### Sorting
 
-**GET** `/api/profiles`
+| Parameter | Values                              |
+| --------- | ----------------------------------- |
+| sort_by   | age, created_at, gender_probability |
+| order     | asc, desc                           |
 
-Query Parameters (optional):
+Default: `created_at desc`
 
-* `gender`
-* `country_id`
-* `age_group`
+---
 
-Example:
+### Pagination
+
+| Parameter | Default | Max |
+| --------- | ------- | --- |
+| page      | 1       | -   |
+| limit     | 10      | 50  |
+
+---
+
+### Example
 
 ```
-/api/profiles?gender=male&country_id=NG
+/api/profiles?gender=male&country_id=NG&min_age=25&sort_by=age&order=desc&page=1&limit=10
 ```
 
 ---
 
-### 🔹 Delete Profile
-
-**DELETE** `/api/profiles/:id`
-
-Response:
+### Response
 
 ```
-204 No Content
-```
-
----
-
-## 🧠 Business Logic
-
-### Age Classification
-
-* 0–12 → child
-* 13–19 → teenager
-* 20–59 → adult
-* 60+ → senior
-
-### Nationality Selection
-
-* Chooses the country with the highest probability
-
----
-
-## 🔁 Idempotency
-
-If a profile with the same name already exists:
-
-```json
 {
   "status": "success",
-  "message": "Profile already exists",
-  "data": { ... }
+  "page": 1,
+  "limit": 10,
+  "total": 2026,
+  "data": [ ... ]
 }
 ```
 
 ---
 
-## ⚠️ Error Handling
+# 🧠 2. Natural Language Query Engine (Core Feature)
 
-Standard format:
+### Endpoint
 
-```json
+```
+GET /api/profiles/search?q=<query>
+```
+
+---
+
+## 🔍 Parsing Approach (Rule-Based)
+
+The system uses a **deterministic keyword-matching parser** (no AI/LLMs).
+
+### Step-by-step logic:
+
+1. Convert query to lowercase
+2. Extract keywords using:
+
+   * String matching (`includes`)
+   * Regular expressions (for numbers)
+3. Map keywords to MongoDB filters
+4. Combine all filters into a single query object
+
+---
+
+## 🧩 Supported Keywords & Mappings
+
+### 👤 Gender
+
+| Keyword         | Filter            |
+| --------------- | ----------------- |
+| male            | gender = "male"   |
+| female          | gender = "female" |
+| male and female | no gender filter  |
+
+---
+
+### 🎯 Age Groups
+
+| Keyword  | Filter                 |
+| -------- | ---------------------- |
+| child    | age_group = "child"    |
+| teenager | age_group = "teenager" |
+| adult    | age_group = "adult"    |
+| senior   | age_group = "senior"   |
+
+---
+
+### ⚡ Special Keyword
+
+| Keyword | Meaning           |
+| ------- | ----------------- |
+| young   | age between 16–24 |
+
+---
+
+### 🔢 Age Conditions
+
+| Phrase   | Filter    |
+| -------- | --------- |
+| above 30 | age >= 30 |
+| below 20 | age <= 20 |
+
+---
+
+### 🌍 Country Mapping
+
+| Keyword             | country_id |
+| ------------------- | ---------- |
+| nigeria             | NG         |
+| kenya               | KE         |
+| angola              | AO         |
+| ghana               | GH         |
+| uganda              | UG         |
+| tanzania            | TZ         |
+| usa / united states | US         |
+| uk / united kingdom | GB         |
+
+---
+
+## 🧪 Example Queries
+
+```
+young males from nigeria
+→ gender=male + age 16–24 + country=NG
+```
+
+```
+females above 30
+→ gender=female + age >= 30
+```
+
+```
+adult males from kenya
+→ gender=male + age_group=adult + country=KE
+```
+
+```
+male and female teenagers above 17
+→ age_group=teenager + age >= 17
+```
+
+---
+
+## ❌ Invalid Queries
+
+If a query cannot be interpreted:
+
+```
 {
   "status": "error",
-  "message": "Error message"
+  "message": "Unable to interpret query"
 }
+```
+
+---
+
+# ⚠️ Limitations
+
+The natural language parser is **rule-based**, so it has some limitations:
+
+* Does not understand complex grammar or sentence structure
+* Limited to predefined keywords and mappings
+* Cannot handle typos (e.g., "nigerai")
+* Cannot process multiple countries in one query
+* Does not support advanced logical conditions (OR, NOT)
+* Country mapping is limited to a predefined list
+
+---
+
+# 🌱 Data Seeding
+
+The database is seeded with **2026 profiles** from a JSON file.
+
+### Features:
+
+* Idempotent (no duplicates)
+* Uses `name` as unique identifier
+* Generates UUID v7 for each record
+
+### Run:
+
+```
+node seed.js
+```
+
+---
+
+# ⚙️ Error Handling
+
+All errors follow:
+
+```
+{ "status": "error", "message": "<message>" }
 ```
 
 ### Status Codes
 
-* `400` → Missing or invalid name
-* `404` → Profile not found
-* `502` → External API failure
-* `500` → Internal server error
+| Code | Meaning              |
+| ---- | -------------------- |
+| 400  | Missing parameter    |
+| 422  | Invalid parameter    |
+| 404  | Not found            |
+| 500  | Server error         |
+| 502  | External API failure |
 
 ---
 
-## 🌐 CORS
+# 🚀 Performance Optimizations
 
-Enabled for all origins:
+* Indexed fields:
 
-```
-Access-Control-Allow-Origin: *
-```
-
----
-
-## 🧪 Testing
-
-Use Postman or curl:
-
-```bash
-POST /api/profiles
-Content-Type: application/json
-```
+  * gender
+  * age
+  * age_group
+  * country_id
+  * probabilities
+* Pagination prevents large payloads
+* `.lean()` used for faster queries
+* Query filtering avoids full table scans
 
 ---
 
-## 📈 Future Improvements
+# 🔐 Additional Features
 
-* Pagination
-* Rate limiting
-* Caching external API responses
-* Deployment (Render / Railway)
+* CORS enabled (`Access-Control-Allow-Origin: *`)
+* UUID v7 for all IDs
+* ISO 8601 timestamps (UTC)
+
+---
+
+# ✅ Summary
+
+This API provides:
+
+* High-performance filtering and querying
+* Clean RESTful design
+* Deterministic natural language parsing
+* Scalable architecture for real-world use
 
 ---
 
-## 👨‍💻 Author
+# 👨‍💻 Author
 
-Silent Architect
-
----
+Backend Wizards Stage 2 Submission
