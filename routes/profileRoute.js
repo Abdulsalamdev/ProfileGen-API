@@ -1,20 +1,29 @@
-const express = require("express")
-const router = express.Router()
-
+const express = require("express");
+const router = express.Router();
 
 const {
-    createProfile,
-    deleteProfile,
-    getProfile,
-    getAllProfiles
-} = require("../controllers/profileController")
-const { searchProfiles } = require("../controllers/searchController")
+  createProfile,
+  getProfile,
+  getAllProfiles,
+  deleteProfile,
+  searchProfiles
+} = require("../controllers/profileController");
 
-router.post("/", createProfile)
-router.get("/search", searchProfiles)
-router.get("/:id", getProfile)
-router.get("/",getAllProfiles)
-router.delete("/:id", deleteProfile)
+// Create profile
+router.post("/", createProfile);
+
+// Get all profiles (filter + sort + pagination)
+router.get("/", getAllProfiles);
+
+// search 
+router.get("/search", searchProfiles);
+
+// Get single profile
+router.get("/:id", getProfile);
+
+// Delete profile
+router.delete("/:id", deleteProfile);
 
 
-module.exports = router
+
+module.exports = router;

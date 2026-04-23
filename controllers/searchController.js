@@ -12,64 +12,43 @@ exports.searchProfiles = async (req, res) => {
     }
 
     q = q.toLowerCase();
-
     let filter = {};
 
     // Gender
-    if (q.includes("male") && !q.includes("female")) {
-      filter.gender = "male";
-    }
-
-    if (q.includes("female")) {
-      filter.gender = "female";
-    }
-
-    if (q.includes("male and female")) {
-      delete filter.gender;
-    }
+    if (q.includes("male") && !q.includes("female")) filter.gender = "male";
+    if (q.includes("female")) filter.gender = "female";
+    if (q.includes("male and female")) delete filter.gender;
 
     // Age group
-    ["child", "teenager", "adult", "senior"].forEach(group => {
-      if (q.includes(group)) {
-        filter.age_group = group;
-      }
+    ["child", "teenager", "adult", "senior"].forEach(g => {
+      if (q.includes(g)) filter.age_group = g;
     });
 
-    // Young logic
+    // Young
     if (q.includes("young")) {
       filter.age = { $gte: 16, $lte: 24 };
     }
 
     // Above / Below
     const above = q.match(/above (\d+)/);
-    if (above) {
-      filter.age = { ...(filter.age || {}), $gte: Number(above[1]) };
-    }
+    if (above) filter.age = { ...(filter.age || {}), $gte: Number(above[1]) };
 
     const below = q.match(/below (\d+)/);
-    if (below) {
-      filter.age = { ...(filter.age || {}), $lte: Number(below[1]) };
-    }
+    if (below) filter.age = { ...(filter.age || {}), $lte: Number(below[1]) };
 
-    // Country map
-    const countryMap = {
+    // Country
+    const map = {
       nigeria: "NG",
       kenya: "KE",
       angola: "AO",
       ghana: "GH",
       uganda: "UG",
-      tanzania: "TZ",
-      usa: "US",
-      "united states": "US",
-      uk: "GB",
-      "united kingdom": "GB"
+      tanzania: "TZ"
     };
 
-    Object.keys(countryMap).forEach(country => {
-      if (q.includes(country)) {
-        filter.country_id = countryMap[country];
-      }
-    });
+    for (const key in map) {
+      if (q.includes(key)) filter.country_id = map[key];
+    }
 
     if (Object.keys(filter).length === 0) {
       return res.status(422).json({
@@ -78,8 +57,8 @@ exports.searchProfiles = async (req, res) => {
       });
     }
 
-    page = parseInt(page);
-    limit = Math.min(parseInt(limit), 50);
+    page = Math.max(parseInt(page), 1);
+    limit = Math.min(parseInt(limit) || 10, 50);
 
     const total = await Profile.countDocuments(filter);
 
@@ -96,8 +75,7 @@ exports.searchProfiles = async (req, res) => {
       data
     });
 
-  } catch (error) {
-    console.error(error);
+  } catch {
     return res.status(500).json({
       status: "error",
       message: "Internal server error"

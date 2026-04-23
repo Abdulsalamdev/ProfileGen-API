@@ -1,6 +1,6 @@
-# 🚀 Backend Wizards Stage 2 — Intelligence Query Engine
+# Backend Wizards Stage 2 — Intelligence Query Engine
 
-## 📌 Overview
+## Overview
 
 This project is a **demographic intelligence API** built for Insighta Labs.
 It allows clients (marketing teams, analysts, product teams) to:
@@ -18,7 +18,7 @@ The system is built using:
 
 ---
 
-## 🌐 Base URL
+## Base URL
 
 ```
 https://your-api-url.com
@@ -26,7 +26,7 @@ https://your-api-url.com
 
 ---
 
-# 📦 Data Model
+# Data Model
 
 Each profile follows this structure:
 
@@ -47,7 +47,7 @@ Each profile follows this structure:
 
 ---
 
-# 🧠 Core Features
+# Core Features
 
 ## 1. Advanced Filtering, Sorting & Pagination
 
@@ -113,7 +113,7 @@ Default: `created_at desc`
 
 ---
 
-# 🧠 2. Natural Language Query Engine (Core Feature)
+# 2. Natural Language Query Engine (Core Feature)
 
 ### Endpoint
 
@@ -123,7 +123,7 @@ GET /api/profiles/search?q=<query>
 
 ---
 
-## 🔍 Parsing Approach (Rule-Based)
+## Parsing Approach (Rule-Based)
 
 The system uses a **deterministic keyword-matching parser** (no AI/LLMs).
 
@@ -139,9 +139,9 @@ The system uses a **deterministic keyword-matching parser** (no AI/LLMs).
 
 ---
 
-## 🧩 Supported Keywords & Mappings
+## Supported Keywords & Mappings
 
-### 👤 Gender
+### Gender
 
 | Keyword         | Filter            |
 | --------------- | ----------------- |
@@ -151,7 +151,7 @@ The system uses a **deterministic keyword-matching parser** (no AI/LLMs).
 
 ---
 
-### 🎯 Age Groups
+### Age Groups
 
 | Keyword  | Filter                 |
 | -------- | ---------------------- |
@@ -162,7 +162,7 @@ The system uses a **deterministic keyword-matching parser** (no AI/LLMs).
 
 ---
 
-### ⚡ Special Keyword
+### Special Keyword
 
 | Keyword | Meaning           |
 | ------- | ----------------- |
@@ -170,7 +170,7 @@ The system uses a **deterministic keyword-matching parser** (no AI/LLMs).
 
 ---
 
-### 🔢 Age Conditions
+### Age Conditions
 
 | Phrase   | Filter    |
 | -------- | --------- |
@@ -179,7 +179,7 @@ The system uses a **deterministic keyword-matching parser** (no AI/LLMs).
 
 ---
 
-### 🌍 Country Mapping
+### Country Mapping
 
 | Keyword             | country_id |
 | ------------------- | ---------- |
@@ -218,7 +218,7 @@ male and female teenagers above 17
 
 ---
 
-## ❌ Invalid Queries
+## Invalid Queries
 
 If a query cannot be interpreted:
 
@@ -231,7 +231,7 @@ If a query cannot be interpreted:
 
 ---
 
-# ⚠️ Limitations
+# Limitations
 
 The natural language parser is **rule-based**, so it has some limitations:
 
@@ -244,7 +244,7 @@ The natural language parser is **rule-based**, so it has some limitations:
 
 ---
 
-# 🌱 Data Seeding
+# Data Seeding
 
 The database is seeded with **2026 profiles** from a JSON file.
 
@@ -262,7 +262,7 @@ node seed.js
 
 ---
 
-# ⚙️ Error Handling
+# Error Handling
 
 All errors follow:
 
@@ -282,7 +282,7 @@ All errors follow:
 
 ---
 
-# 🚀 Performance Optimizations
+# Performance Optimizations
 
 * Indexed fields:
 
@@ -297,7 +297,7 @@ All errors follow:
 
 ---
 
-# 🔐 Additional Features
+# Additional Features
 
 * CORS enabled (`Access-Control-Allow-Origin: *`)
 * UUID v7 for all IDs
@@ -305,7 +305,7 @@ All errors follow:
 
 ---
 
-# ✅ Summary
+# Summary
 
 This API provides:
 
@@ -316,6 +316,6 @@ This API provides:
 
 ---
 
-# 👨‍💻 Author
+#  Author
 
 Backend Wizards Stage 2 Submission
