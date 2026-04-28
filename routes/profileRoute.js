@@ -9,14 +9,17 @@ const {
   searchProfiles
 } = require("../controllers/profileController");
 
+const auth = require("../middleware/authMiddleware")
+const requireRole = require("../middleware/roleMiddleware")
+
 // Create profile
 router.post("/", createProfile);
 
 // Get all profiles (filter + sort + pagination)
-router.get("/", getAllProfiles);
+router.get("/", auth,getAllProfiles);
 
 // search 
-router.get("/search", searchProfiles);
+router.get("/search", auth,searchProfiles);
 
 // Get single profile
 router.get("/:id", getProfile);
