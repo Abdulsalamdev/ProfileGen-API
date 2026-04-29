@@ -30,13 +30,24 @@ exports.login = async (req, res) => {
     user.refresh_token = refreshToken;
     await user.save();
 
-    return res.status(200).json({
-      status: "success",
-      data: {
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      },
-    });
+    return res
+      .cookie("access_token", accessToken, {
+        httpOnly: true,
+        secure: false, // true in production (HTTPS)
+        sameSite: "strict",
+        maxAge: 15 * 60 * 1000,
+      })
+      .cookie("refresh_token", refreshToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      })
+      .status(200)
+      .json({
+        status: "success",
+        message: "Logged in",
+      });
   } catch (err) {
     console.log(err);
     return res.status(500).json({
@@ -49,43 +60,54 @@ exports.login = async (req, res) => {
 // refresh token endpoint
 exports.refresh = async (req, res) => {
   try {
-    const { refresh_token } = req.body;
+    const refreshToken = req.cookies.refresh_token;
 
-    if (!refresh_token) {
-      return res.status(400).json({
+    if (!refreshToken) {
+      return res.status(401).json({
         status: "error",
-        message: "Rferesh token required",
-      });
-
-      const decoded = require("jsonwebtoken").verify(
-        refresh_token,
-        process.env.JWT_REFRESH_SECRET,
-      );
-
-      const user = await User.findById(decoded.id);
-
-      if (!user || user.refresh_token !== refresh_token) {
-        return res.status(401).json({
-          status: "error",
-          message: "Invalid refresh token",
-        });
-      }
-
-      // rotate token
-      const newAccessToken = generateAccessToken(user);
-      const newRefreshToken = generateRefreshToken(user);
-
-      user.refresh_token = newRefreshToken;
-      await user.save();
-
-      return res.status(200).json({
-        status: "success",
-        data: {
-          access_token: newAccessToken,
-          refresh_token: newRefreshToken,
-        },
+        message: "No refresh token",
       });
     }
+
+    const decoded = require("jsonwebtoken").verify(
+      refresh_token,
+      process.env.JWT_REFRESH_SECRET,
+    );
+
+    const user = await User.findById(decoded.id);
+
+    if (!user || user.refresh_token !== refresh_token) {
+      return res.status(401).json({
+        status: "error",
+        message: "Invalid refresh token",
+      });
+    }
+
+    // rotate token
+    const newAccessToken = generateAccessToken(user);
+    const newRefreshToken = generateRefreshToken(user);
+
+    user.refresh_token = newRefreshToken;
+    await user.save();
+
+    return res
+      .cookie("access_token", accessToken, {
+        httpOnly: true,
+        secure: false, // true in production (HTTPS)
+        sameSite: "strict",
+        maxAge: 15 * 60 * 1000,
+      })
+      .cookie("refresh_token", refreshToken, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      })
+      .status(200)
+      .json({
+        status: "success",
+        message: "Logged in",
+      });
   } catch (err) {
     console.log(err);
     return res.status(401).json({
@@ -94,7 +116,6 @@ exports.refresh = async (req, res) => {
     });
   }
 };
-
 //logout endpoint
 
 exports.logout = async (req, res) => {
@@ -106,10 +127,14 @@ exports.logout = async (req, res) => {
       await user.save();
     }
 
-    return res.status(200).json({
-      status: "success",
-      message: "Logged out successfully",
-    });
+    return res
+      .clearCookie("access_token")
+      .clearCookie("refresh_token")
+      .status(200)
+      .json({
+        status: "success",
+        message: "Logged out",
+      });
   } catch (err) {
     return res.status(500).json({
       status: "error",
@@ -186,14 +211,14 @@ exports.githubCallback = async (req, res) => {
 
     const githubUser = userRes.data;
 
-     // Find or create user
+    // Find or create user
     let user = await User.findOne({ github_id: githubUser.id });
 
     if (!user) {
       user = await User.create({
         github_id: githubUser.id,
         username: githubUser.login,
-        role: "analyst"
+        role: "analyst",
       });
     }
 
@@ -208,15 +233,14 @@ exports.githubCallback = async (req, res) => {
       status: "success",
       data: {
         access_token: accessToken,
-        refresh_token: refreshToken
-      }
+        refresh_token: refreshToken,
+      },
     });
-
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       status: "error",
-      message: "OAuth failed"
+      message: "OAuth failed",
     });
   }
 };

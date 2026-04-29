@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken")
 module.exports = (req,res,next) => {
     try {
         const authHeader = req.headers.authoriztion
+        const cookieHeader = req.cookies.access_token
         
 
         if(!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -13,7 +14,7 @@ module.exports = (req,res,next) => {
             })
         }
 
-        const token = authHeader.split(" ")[1]
+        const token = authHeader.split(" ")[1] || cookieHeader
 
         const decoded = jwt.verify(token,process.env.JWT_SECRET)
         req.user = decoded

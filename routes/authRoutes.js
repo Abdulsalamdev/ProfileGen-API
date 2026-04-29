@@ -10,11 +10,12 @@ refresh,
 githubLogin,
 githubCallback
 } = require("../controllers/authController")
+const csrfProtection = require("../middleware/csrf")
 
 
 router.post("/login", login)
-router.post("/refresh", refresh)
-router.post("/logout", authMiddleware, logout)
+router.post("/refresh", csrfProtection,refresh)
+router.post("/logout", authMiddleware,csrfProtection, logout)
 
 // GitHub OAuth
 router.get("/github", githubLogin);
