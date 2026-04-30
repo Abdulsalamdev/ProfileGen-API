@@ -6,27 +6,35 @@ const {
   getProfile,
   getAllProfiles,
   deleteProfile,
-  searchProfiles
+  searchProfiles,
+  exportProfiles
 } = require("../controllers/profileController");
 
-const auth = require("../middleware/authMiddleware")
-const requireRole = require("../middleware/roleMiddleware")
+const { protect } = require("../middleware/authMiddleware");
+const authorize = require("../middleware/roleMiddleware");
 
 // Create profile
-router.post("/", createProfile);
+router.post("/",protect,createProfile);
 
 // Get all profiles (filter + sort + pagination)
-router.get("/", auth,getAllProfiles);
+router.get("/",protect, getAllProfiles);
 
-// search 
-router.get("/search", auth,searchProfiles);
+// search
+router.get("/search",protect, searchProfiles);
+
+// export profile
+router.get(
+  "/export",
+  protect,
+  authorize("admin"),
+  exportProfiles
+);
 
 // Get single profile
 router.get("/:id", getProfile);
 
 // Delete profile
-router.delete("/:id", deleteProfile);
-
-
+router.delete("/:id",protect, authorize("admin"), deleteProfile);
 
 module.exports = router;
+

@@ -1,6 +1,6 @@
 const Profile = require("../models/Profile");
 const { v7: uuidv7 } = require("uuid");
-
+const { Parser } = require("json2csv");
 
 function getAgeGroup(age) {
   if (age <= 12) return "child";
@@ -9,7 +9,6 @@ function getAgeGroup(age) {
   return "senior";
 }
 
-
 exports.createProfile = async (req, res) => {
   try {
     let { name } = req.body;
@@ -17,7 +16,7 @@ exports.createProfile = async (req, res) => {
     if (!name || typeof name !== "string") {
       return res.status(400).json({
         status: "error",
-        message: "Missing or invalid name"
+        message: "Missing or invalid name",
       });
     }
 
@@ -29,11 +28,9 @@ exports.createProfile = async (req, res) => {
       return res.status(200).json({
         status: "success",
         message: "Profile already exists",
-        data: existing
+        data: existing,
       });
     }
-
-   
 
     const profile = await Profile.create({
       id: uuidv7(),
@@ -45,22 +42,20 @@ exports.createProfile = async (req, res) => {
       country_id: (req.body.country_id || "NG").toUpperCase(),
       country_name: req.body.country_name || "Nigeria",
       country_probability: req.body.country_probability || 1,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     });
 
     return res.status(201).json({
       status: "success",
-      data: profile
+      data: profile,
     });
-
   } catch (err) {
     return res.status(500).json({
       status: "error",
-      message: "Internal server error"
+      message: "Internal server error",
     });
   }
 };
-
 
 exports.getProfile = async (req, res) => {
   const profile = await Profile.findOne({ id: req.params.id });
@@ -68,16 +63,15 @@ exports.getProfile = async (req, res) => {
   if (!profile) {
     return res.status(404).json({
       status: "error",
-      message: "Profile not found"
+      message: "Profile not found",
     });
   }
 
   return res.json({
     status: "success",
-    data: profile
+    data: profile,
   });
 };
-
 
 exports.getAllProfiles = async (req, res) => {
   try {
@@ -92,12 +86,12 @@ exports.getAllProfiles = async (req, res) => {
       sort_by,
       order = "asc",
       page = 1,
-      limit = 10
+      limit = 10,
     } = req.query;
 
-    page = parseInt(page);
-    limit = Math.min(parseInt(limit), 50);
-
+    page = Math.max(parseInt(req.query.page) || 1, 1);
+    limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const skip = (page - 1) * limit;
 
     let filter = {};
 
@@ -119,7 +113,6 @@ exports.getAllProfiles = async (req, res) => {
       filter.country_probability = { $gte: Number(min_country_probability) };
     }
 
-   
     const allowedSort = ["age", "created_at", "gender_probability"];
 
     let sort = {};
@@ -127,7 +120,7 @@ exports.getAllProfiles = async (req, res) => {
       if (!allowedSort.includes(sort_by)) {
         return res.status(400).json({
           status: "error",
-          message: "Invalid query parameters"
+          message: "Invalid query parameters",
         });
       }
 
@@ -136,30 +129,31 @@ exports.getAllProfiles = async (req, res) => {
       sort.created_at = -1;
     }
 
- 
     const total = await Profile.countDocuments(filter);
 
-    const data = await Profile.find(filter)
-      .sort(sort)
-      .skip((page - 1) * limit)
-      .limit(limit);
+    const data = await Profile.find(filter).sort(sort).skip(skip).limit(limit);
 
-    return res.json({
+    const totalPages = Math.ceil(total / limit);
+
+    return res.status(200).json({
       status: "success",
-      page,
-      limit,
-      total,
-      data
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        total_pages: totalPages,
+        has_next: page < totalPages,
+        has_prev: page > 1,
+      },
     });
-
   } catch (err) {
     return res.status(500).json({
       status: "error",
-      message: "Internal server error"
+      message: "Internal server error",
     });
   }
 };
-
 
 exports.deleteProfile = async (req, res) => {
   const deleted = await Profile.findOneAndDelete({ id: req.params.id });
@@ -167,13 +161,12 @@ exports.deleteProfile = async (req, res) => {
   if (!deleted) {
     return res.status(404).json({
       status: "error",
-      message: "Profile not found"
+      message: "Profile not found",
     });
   }
 
   return res.status(204).send();
 };
-
 
 exports.searchProfiles = async (req, res) => {
   try {
@@ -182,17 +175,15 @@ exports.searchProfiles = async (req, res) => {
     if (!q) {
       return res.status(400).json({
         status: "error",
-        message: "Missing query"
+        message: "Missing query",
       });
     }
 
     let filter = {};
 
-   
     if (q.includes("male")) filter.gender = "male";
     if (q.includes("female")) filter.gender = "female";
 
-   
     if (q.includes("child")) filter.age_group = "child";
     if (q.includes("teen")) filter.age_group = "teenager";
     if (q.includes("adult")) filter.age_group = "adult";
@@ -209,7 +200,6 @@ exports.searchProfiles = async (req, res) => {
       }
     }
 
-   
     const countries = {
       nigeria: "NG",
       kenya: "KE",
@@ -218,7 +208,7 @@ exports.searchProfiles = async (req, res) => {
       ethiopia: "ET",
       tanzania: "TZ",
       sudan: "SD",
-      rwanda: "RW"
+      rwanda: "RW",
     };
 
     for (const [key, val] of Object.entries(countries)) {
@@ -227,11 +217,10 @@ exports.searchProfiles = async (req, res) => {
       }
     }
 
-   
     if (Object.keys(filter).length === 0) {
       return res.status(400).json({
         status: "error",
-        message: "Unable to interpret query"
+        message: "Unable to interpret query",
       });
     }
 
@@ -239,13 +228,46 @@ exports.searchProfiles = async (req, res) => {
 
     return res.json({
       status: "success",
-      data: results
+      data: results,
     });
-
   } catch (err) {
     return res.status(500).json({
       status: "error",
-      message: "Internal server error"
+      message: "Internal server error",
+    });
+  }
+};
+
+
+exports.exportProfiles = async (req, res) => {
+  try {
+    const profiles = await Profile.find({});
+
+    const fields = [
+      "id",
+      "name",
+      "gender",
+      "gender_probability",
+      "age",
+      "age_group",
+      "country_id",
+      "country_name",
+      "country_probability",
+      "created_at"
+    ];
+
+    const parser = new Parser({ fields });
+    const csv = parser.parse(profiles);
+
+    res.header("Content-Type", "text/csv");
+    res.attachment("profiles.csv");
+
+    return res.send(csv);
+
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to export CSV"
     });
   }
 };
