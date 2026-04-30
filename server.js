@@ -28,9 +28,10 @@ const csrfProtection = csrf({
     sameSite: "strict"
   }
 });
+app.use(csrfProtection);
 
 // expose token route
-app.get("/api/v1/auth/csrf-token", csrfProtection, (req, res) => {
+app.get("/api/v1/auth/csrf-token", (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
