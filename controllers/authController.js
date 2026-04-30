@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const { generateAccessToken, generateRefreshToken } = require("../utils/token");
 const axios = require("axios");
+const { v7: uuidv7 } = require("uuid");
 
 // login endpoint
 exports.login = async (req, res) => {
@@ -33,13 +34,13 @@ exports.login = async (req, res) => {
     return res
       .cookie("access_token", accessToken, {
         httpOnly: true,
-        secure: false, // true in production (HTTPS)
+        secure: true, // true in production (HTTPS)
         sameSite: "strict",
         maxAge: 15 * 60 * 1000,
       })
       .cookie("refresh_token", refreshToken, {
         httpOnly: true,
-        secure: false,
+        secure: true,
         sameSite: "strict",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
@@ -60,21 +61,19 @@ exports.login = async (req, res) => {
 // refresh token endpoint
 exports.refresh = async (req, res) => {
   try {
-    const refreshToken = req.cookies.refresh_token;
+    // const refreshToken = req.cookies.refresh_token;
+    const { refresh_token } = req.body;
 
-    if (!refreshToken) {
+    if (!refresh_token) {
       return res.status(401).json({
         status: "error",
         message: "No refresh token",
       });
     }
 
-    const decoded = require("jsonwebtoken").verify(
-      refresh_token,
-      process.env.JWT_REFRESH_SECRET,
-    );
+    const decoded = verifyRefreshToken(refresh_token);
 
-    const user = await User.findById(decoded.id);
+    const user = await User.findOne(decoded.id);
 
     if (!user || user.refresh_token !== refresh_token) {
       return res.status(401).json({
@@ -85,29 +84,11 @@ exports.refresh = async (req, res) => {
 
     // rotate token
     const newAccessToken = generateAccessToken(user);
-    const newRefreshToken = generateRefreshToken(user);
 
-    user.refresh_token = newRefreshToken;
-    await user.save();
-
-    return res
-      .cookie("access_token", accessToken, {
-        httpOnly: true,
-        secure: false, // true in production (HTTPS)
-        sameSite: "strict",
-        maxAge: 15 * 60 * 1000,
-      })
-      .cookie("refresh_token", refreshToken, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      })
-      .status(200)
-      .json({
-        status: "success",
-        message: "Logged in",
-      });
+    return res.status(200).json({
+      status: "success",
+      access_token: newAccessToken,
+    });
   } catch (err) {
     console.log(err);
     return res.status(401).json({
@@ -170,12 +151,12 @@ exports.githubLogin = async (req, res) => {
 
 exports.githubCallback = async (req, res) => {
   try {
-    const { code, code_verifier } = req.query;
+    const { code } = req.query;
 
-    if (!code || !code_verifier) {
+    if (!code) {
       return res.status(400).json({
         status: "error",
-        message: "Missing code or verifier",
+        message: "Missing code",
       });
     }
 
@@ -186,7 +167,6 @@ exports.githubCallback = async (req, res) => {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
-        code_verifier,
       },
       {
         headers: { Accept: "application/json" },
@@ -216,6 +196,7 @@ exports.githubCallback = async (req, res) => {
 
     if (!user) {
       user = await User.create({
+        id: uuidv7(),
         github_id: githubUser.id,
         username: githubUser.login,
         role: "analyst",
@@ -229,18 +210,26 @@ exports.githubCallback = async (req, res) => {
     user.refresh_token = refreshToken;
     await user.save();
 
-    return res.status(200).json({
-      status: "success",
-      data: {
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      },
+    res.cookie("access_token", accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000,
     });
+
+    res.cookie("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.redirect("http://localhost:5173/dashboard");
   } catch (err) {
     console.error(err);
     return res.status(500).json({
       status: "error",
-      message: "OAuth failed",
+      message: "authentication failed",
     });
   }
 };

@@ -1,10 +1,10 @@
 const jwt = require("jsonwebtoken")
 
 
-module.exports = (req,res,next) => {
+exports.protect = (req,res,next) => {
     try {
-        const authHeader = req.headers.authoriztion
-        const cookieHeader = req.cookies.access_token
+        const authHeader = req.headers.authorization
+        const cookieHeader = req.cookies?.access_token
         
 
         if(!authHeader || !authHeader.startsWith("Bearer ")) {
