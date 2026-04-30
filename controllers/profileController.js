@@ -89,8 +89,8 @@ exports.getAllProfiles = async (req, res) => {
       limit = 10,
     } = req.query;
 
-    page = Math.max(parseInt(req.query.page) || 1, 1);
-    limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    page = Math.max(parseInt(page) || 1, 1);
+    limit = Math.min(parseInt(limit) || 10, 50);
     const skip = (page - 1) * limit;
 
     let filter = {};
@@ -101,21 +101,33 @@ exports.getAllProfiles = async (req, res) => {
 
     if (min_age || max_age) {
       filter.age = {};
+      if (min_age && isNaN(min_age)) {
+        return res.status(422).json({ status: "error", message: "Invalid query parameters" });
+      }
+      if (max_age && isNaN(max_age)) {
+        return res.status(422).json({ status: "error", message: "Invalid query parameters" });
+      }
       if (min_age) filter.age.$gte = Number(min_age);
       if (max_age) filter.age.$lte = Number(max_age);
     }
 
     if (min_gender_probability) {
+      if (isNaN(min_gender_probability)) {
+        return res.status(422).json({ status: "error", message: "Invalid query parameters" });
+      }
       filter.gender_probability = { $gte: Number(min_gender_probability) };
     }
 
     if (min_country_probability) {
+      if (isNaN(min_country_probability)) {
+        return res.status(422).json({ status: "error", message: "Invalid query parameters" });
+      }
       filter.country_probability = { $gte: Number(min_country_probability) };
     }
 
     const allowedSort = ["age", "created_at", "gender_probability"];
+    let sort = { created_at: -1 };
 
-    let sort = {};
     if (sort_by) {
       if (!allowedSort.includes(sort_by)) {
         return res.status(400).json({
@@ -123,29 +135,18 @@ exports.getAllProfiles = async (req, res) => {
           message: "Invalid query parameters",
         });
       }
-
-      sort[sort_by] = order === "desc" ? -1 : 1;
-    } else {
-      sort.created_at = -1;
+      sort = { [sort_by]: order === "desc" ? -1 : 1 };
     }
 
     const total = await Profile.countDocuments(filter);
-
     const data = await Profile.find(filter).sort(sort).skip(skip).limit(limit);
-
-    const totalPages = Math.ceil(total / limit);
 
     return res.status(200).json({
       status: "success",
+      page,
+      limit,
+      total,
       data,
-      meta: {
-        page,
-        limit,
-        total,
-        total_pages: totalPages,
-        has_next: page < totalPages,
-        has_prev: page > 1,
-      },
     });
   } catch (err) {
     return res.status(500).json({
@@ -172,6 +173,10 @@ exports.searchProfiles = async (req, res) => {
   try {
     const q = req.query.q?.toLowerCase();
 
+    let page = Math.max(parseInt(req.query.page) || 1, 1);
+    let limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const skip = (page - 1) * limit;
+
     if (!q) {
       return res.status(400).json({
         status: "error",
@@ -181,40 +186,42 @@ exports.searchProfiles = async (req, res) => {
 
     let filter = {};
 
-    if (q.includes("male")) filter.gender = "male";
-    if (q.includes("female")) filter.gender = "female";
+    // gender (handle multiple)
+    if (q.includes("male") && q.includes("female")) {
+      // no filter (both allowed)
+    } else if (q.includes("male")) {
+      filter.gender = "male";
+    } else if (q.includes("female")) {
+      filter.gender = "female";
+    }
 
+    // age group
     if (q.includes("child")) filter.age_group = "child";
     if (q.includes("teen")) filter.age_group = "teenager";
     if (q.includes("adult")) filter.age_group = "adult";
     if (q.includes("senior")) filter.age_group = "senior";
 
+    // young override
     if (q.includes("young")) {
       filter.age = { $gte: 16, $lte: 24 };
     }
 
-    if (q.includes("above")) {
-      const match = q.match(/above (\d+)/);
-      if (match) {
-        filter.age = { $gte: Number(match[1]) };
-      }
+    // above X
+    const aboveMatch = q.match(/above (\d+)/);
+    if (aboveMatch) {
+      filter.age = { $gte: Number(aboveMatch[1]) };
     }
 
+    // country
     const countries = {
       nigeria: "NG",
       kenya: "KE",
-      uganda: "UG",
+      angola: "AO",
       ghana: "GH",
-      ethiopia: "ET",
-      tanzania: "TZ",
-      sudan: "SD",
-      rwanda: "RW",
     };
 
     for (const [key, val] of Object.entries(countries)) {
-      if (q.includes(key)) {
-        filter.country_id = val;
-      }
+      if (q.includes(key)) filter.country_id = val;
     }
 
     if (Object.keys(filter).length === 0) {
@@ -224,12 +231,17 @@ exports.searchProfiles = async (req, res) => {
       });
     }
 
-    const results = await Profile.find(filter);
+    const total = await Profile.countDocuments(filter);
+    const data = await Profile.find(filter).skip(skip).limit(limit);
 
-    return res.json({
+    return res.status(200).json({
       status: "success",
-      data: results,
+      page,
+      limit,
+      total,
+      data,
     });
+
   } catch (err) {
     return res.status(500).json({
       status: "error",
@@ -241,7 +253,14 @@ exports.searchProfiles = async (req, res) => {
 
 exports.exportProfiles = async (req, res) => {
   try {
-    const profiles = await Profile.find({});
+    const profiles = await Profile.find({}).lean(); // ✅ FIX
+
+    if (!profiles.length) {
+      return res.status(404).json({
+        status: "error",
+        message: "No profiles found",
+      });
+    }
 
     const fields = [
       "id",
@@ -253,7 +272,7 @@ exports.exportProfiles = async (req, res) => {
       "country_id",
       "country_name",
       "country_probability",
-      "created_at"
+      "created_at",
     ];
 
     const parser = new Parser({ fields });
@@ -263,11 +282,11 @@ exports.exportProfiles = async (req, res) => {
     res.attachment("profiles.csv");
 
     return res.send(csv);
-
   } catch (error) {
+    console.error("CSV ERROR:", error); // 👈 add this
     return res.status(500).json({
       status: "error",
-      message: "Failed to export CSV"
+      message: "Failed to export CSV",
     });
   }
 };

@@ -1,46 +1,78 @@
 const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
-const profileRoute = require("./routes/profileRoute");
+const profileRoutes = require("./routes/profileRoute");
 const authRoutes = require("./routes/authRoutes");
 const cookieParser = require("cookie-parser");
 const csrf = require("csurf");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const rateLimit = require("express-rate-limit");
+const { errorHandler } = require("./middleware/errorMiddleware");
+
 const app = express();
-//connect Database
+
+// Connect DB
 connectDB();
 
+//  Security headers
+app.use(helmet());
 
+// Logging
+app.use(morgan("dev"));
 
-//Middleware
+// Rate limiting (IMPORTANT)
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 mins
+  max: 100, // max requests per IP
+  message: {
+    status: "error",
+    message: "Too many requests, try again later",
+  },
+});
+app.use(limiter);
+
+// CORS 
 app.use(
   cors({
     origin: "*",
-  }),
+    // origin: ["http://localhost:5173", "https://your-frontend.vercel.app"],
+    credentials: true,
+  })
 );
 
+// Middleware
 app.use(cookieParser());
 app.use(express.json());
 
-// CSRF protection (cookie-based)
+// CSRF protection
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
-    sameSite: "strict"
-  }
+    sameSite: "strict",
+    secure: false, // set true in production
+  },
 });
-app.use(csrfProtection);
 
-// expose token route
-app.get("/api/v1/auth/csrf-token", (req, res) => {
+// expose CSRF token
+app.get("/api/v1/auth/csrf-token", csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-// Versioned Routes
-app.use("/api/v1/profiles", profileRoute);
+// Apply CSRF to sensitive routes
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/profiles",profileRoutes);
+
+// Root test
+app.get("/", (req, res) => {
+  res.send("Insighta API running...");
+});
+
+// Global error handler (MUST BE LAST)
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log(`server running on port ${PORT}`);
 });
-

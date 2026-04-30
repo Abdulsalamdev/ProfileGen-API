@@ -5,14 +5,21 @@ const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 // generating access token
 const generateAccessToken = (user) => {
-  return jwt.sign({ id: user._id, role: user.role }, ACCESS_SECRET, {
+  return jwt.sign(  {
+      id: user.id,
+      role: user.role,
+      email: user.email
+    }, ACCESS_SECRET, {
     expiresIn: "15m",
   });
 };
 
 // generating refresh token
 const generateRefreshToken = (user) => {
-  return jwt.sign({ id: user._id }, REFRESH_SECRET, { expiresIn: "7d" });
+  return jwt.sign({
+      id: user.id,
+      role: user.role,
+    }, REFRESH_SECRET, { expiresIn: "7d" });
 };
 
 const verifyAccessToken = (token) => {

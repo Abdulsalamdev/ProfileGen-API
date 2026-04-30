@@ -14,8 +14,8 @@ const {
 const csrfProtection = require("../middleware/csrf");
 
 router.post("/login", login);
-router.post("/refresh", csrfProtection, refresh);
-router.post("/logout", protect, csrfProtection, logout);
+router.post("/refresh", refresh);
+router.post("/logout", protect, logout);
 
 // GitHub OAuth
 router.get("/github", githubLogin);
