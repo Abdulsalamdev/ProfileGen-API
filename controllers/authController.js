@@ -39,13 +39,13 @@ exports.login = async (req, res) => {
     return res
       .cookie("access_token", accessToken, {
         httpOnly: true,
-        secure: false, // true in production (HTTPS)
+        secure: true, // true in production (HTTPS)
         sameSite: "strict",
         maxAge: 15 * 60 * 1000,
       })
       .cookie("refresh_token", refreshToken, {
         httpOnly: true,
-        secure: false,
+        secure: true,
         sameSite: "strict",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
@@ -157,10 +157,15 @@ exports.githubLogin = async (req, res) => {
       secure: false, // true in production (HTTPS)
       sameSite: "strict",
     });
+const redirectUri =
+  process.env.NODE_ENV === "production"
+    ? process.env.GITHUB_REDIRECT_URI_PROD
+    : process.env.GITHUB_REDIRECT_URI_LOCAL;
+
 
     const params = new URLSearchParams({
       client_id: process.env.GITHUB_CLIENT_ID,
-      redirect_uri: process.env.GITHUB_REDIRECT_URI,
+      redirect_uri: redirectUri,
       scope: "read:user user:email",
       state,
       code_challenge: codeChallenge,
@@ -231,6 +236,10 @@ exports.githubCallback = async (req, res) => {
         message: "Missing PKCE verifier",
       });
     }
+    const redirectUri =
+  process.env.NODE_ENV === "production"
+    ? process.env.GITHUB_REDIRECT_URI_PROD
+    : process.env.GITHUB_REDIRECT_URI_LOCAL;
 
     const tokenRes = await axios.post(
       "https://github.com/login/oauth/access_token",
@@ -238,7 +247,7 @@ exports.githubCallback = async (req, res) => {
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
-        redirect_uri: process.env.GITHUB_REDIRECT_URI,
+        redirect_uri: redirectUri,
         code_verifier: codeVerifier,
       },
       {
@@ -294,7 +303,7 @@ exports.githubCallback = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    return res.redirect("http://localhost:5173/dashboard");
+    return res.redirect("https://insighta-web-mu-two.vercel.app/dashboard");
   } catch (err) {
     console.error(err);
     return res.status(500).json({

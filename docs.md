@@ -84,7 +84,7 @@ Mock interview prep for this project
 
 
 
-send these first:
+
 
 controllers/authController.js
 routes/authRoutes.js

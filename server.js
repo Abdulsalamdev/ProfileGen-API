@@ -35,8 +35,8 @@ app.use(limiter);
 // CORS 
 app.use(
   cors({
-    origin: "*",
-    // origin: ["http://localhost:5173", "https://your-frontend.vercel.app"],
+    // origin: "*",
+    origin: ["http://localhost:5173", "https://insighta-web-mu-two.vercel.app/"],
     credentials: true,
   })
 );
