@@ -10,6 +10,7 @@ const {
   refresh,
   githubLogin,
   githubCallback,
+  getMe
 } = require("../controllers/authController");
 const csrfProtection = require("../middleware/csrf");
 
@@ -20,5 +21,6 @@ router.post("/logout", protect, logout);
 // GitHub OAuth
 router.get("/github", githubLogin);
 router.get("/github/callback", githubCallback);
+router.get("/me", protect, getMe);
 
 module.exports = router;

@@ -312,3 +312,30 @@ exports.githubCallback = async (req, res) => {
     });
   }
 };
+
+
+exports.getMe = async (req, res) => {
+  try {
+    const user = req.user; // from auth middleware
+
+    if (!user) {
+      return res.status(401).json({
+        status: "error",
+        message: "Unauthorized",
+      });
+    }
+
+    res.json({
+      status: "success",
+      data: {
+        id: user.id,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch user",
+    });
+  }
+};
