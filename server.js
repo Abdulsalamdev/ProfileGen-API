@@ -49,8 +49,8 @@ app.use(express.json());
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
-    sameSite: "strict",
-    secure: false, // set true in production
+    sameSite: "none",
+    secure: true, // set true in production
   },
 });
 

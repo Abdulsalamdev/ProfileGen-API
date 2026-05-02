@@ -40,13 +40,13 @@ exports.login = async (req, res) => {
       .cookie("access_token", accessToken, {
         httpOnly: true,
         secure: true, // true in production (HTTPS)
-        sameSite: "strict",
+        sameSite: "none",
         maxAge: 15 * 60 * 1000,
       })
       .cookie("refresh_token", refreshToken, {
         httpOnly: true,
         secure: true,
-        sameSite: "strict",
+        sameSite: "none",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
       .status(200)
@@ -154,8 +154,8 @@ exports.githubLogin = async (req, res) => {
     // Store verifier in cookie (IMPORTANT)
     res.cookie("pkce_code_verifier", codeVerifier, {
       httpOnly: true,
-      secure: false, // true in production (HTTPS)
-      sameSite: "strict",
+      secure: true, // true in production (HTTPS)
+      sameSite: "none",
     });
 const redirectUri =
   process.env.NODE_ENV === "production"
@@ -292,14 +292,14 @@ exports.githubCallback = async (req, res) => {
     res.cookie("access_token", accessToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 15 * 60 * 1000,
     });
 
     res.cookie("refresh_token", refreshToken, {
       httpOnly: true,
       secure: true,
-      sameSite: "strict",
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
