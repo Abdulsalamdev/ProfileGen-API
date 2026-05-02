@@ -15,10 +15,6 @@ const app = express();
 // Connect DB
 connectDB();
 
-
-// Logging
-app.use(morgan("dev"));
-
 // Rate limiting (IMPORTANT)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 mins
@@ -39,7 +35,7 @@ app.use(
   })
 );
 
-app.options("*", cors())
+// app.options("/*", cors()); // valid
 
 // security header
 app.use(
@@ -48,10 +44,12 @@ app.use(
   })
 );
 
-
 // Middleware
 app.use(cookieParser());
 app.use(express.json());
+
+// Logging
+app.use(morgan("dev"));
 
 // CSRF protection
 const csrfProtection = csrf({
