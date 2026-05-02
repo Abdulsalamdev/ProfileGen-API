@@ -303,7 +303,7 @@ exports.githubCallback = async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    return res.redirect("https://insighta-web-mu-two.vercel.app/dashboard");
+    return res.redirect("https://insighta-web-mu-two.vercel.app");
   } catch (err) {
     console.error(err);
     return res.status(500).json({
