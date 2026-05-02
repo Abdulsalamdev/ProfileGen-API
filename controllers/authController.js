@@ -114,8 +114,21 @@ exports.logout = async (req, res) => {
     }
 
     return res
-      .clearCookie("access_token")
-      .clearCookie("refresh_token")
+      .clearCookie("access_token", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      })
+      .clearCookie("refresh_token", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      })
+      .clearCookie("_csrf", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      })
       .status(200)
       .json({
         status: "success",
@@ -157,11 +170,10 @@ exports.githubLogin = async (req, res) => {
       secure: true, // true in production (HTTPS)
       sameSite: "none",
     });
-const redirectUri =
-  process.env.NODE_ENV === "production"
-    ? process.env.GITHUB_REDIRECT_URI_PROD
-    : process.env.GITHUB_REDIRECT_URI_LOCAL;
-
+    const redirectUri =
+      process.env.NODE_ENV === "production"
+        ? process.env.GITHUB_REDIRECT_URI_PROD
+        : process.env.GITHUB_REDIRECT_URI_LOCAL;
 
     const params = new URLSearchParams({
       client_id: process.env.GITHUB_CLIENT_ID,
@@ -186,7 +198,6 @@ const redirectUri =
 
 exports.githubCallback = async (req, res) => {
   try {
-    
     const { code } = req.query;
 
     if (!code) {
@@ -195,7 +206,6 @@ exports.githubCallback = async (req, res) => {
         message: "Missing code",
       });
     }
-
 
     if (code === "test_code") {
       const adminUser = await User.findOne({ role: "admin" });
@@ -206,8 +216,6 @@ exports.githubCallback = async (req, res) => {
           message: "Admin user not seeded",
         });
       }
-
-      
 
       const accessToken = generateAccessToken(adminUser);
       const refreshToken = generateRefreshToken(adminUser);
@@ -226,20 +234,18 @@ exports.githubCallback = async (req, res) => {
       });
     }
 
+    const codeVerifier = req.cookies.pkce_code_verifier;
 
-
- const codeVerifier = req.cookies.pkce_code_verifier;
-
-  if (!codeVerifier) {
+    if (!codeVerifier) {
       return res.status(400).json({
         status: "error",
         message: "Missing PKCE verifier",
       });
     }
     const redirectUri =
-  process.env.NODE_ENV === "production"
-    ? process.env.GITHUB_REDIRECT_URI_PROD
-    : process.env.GITHUB_REDIRECT_URI_LOCAL;
+      process.env.NODE_ENV === "production"
+        ? process.env.GITHUB_REDIRECT_URI_PROD
+        : process.env.GITHUB_REDIRECT_URI_LOCAL;
 
     const tokenRes = await axios.post(
       "https://github.com/login/oauth/access_token",
@@ -313,7 +319,6 @@ exports.githubCallback = async (req, res) => {
   }
 };
 
-
 exports.getMe = async (req, res) => {
   try {
     const user = req.user; // from auth middleware
@@ -325,6 +330,7 @@ exports.getMe = async (req, res) => {
       });
     }
 
+     res.set("Cache-Control", "no-store"); 
     res.json({
       status: "success",
       data: {
