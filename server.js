@@ -15,8 +15,6 @@ const app = express();
 // Connect DB
 connectDB();
 
-//  Security headers
-app.use(helmet());
 
 // Logging
 app.use(morgan("dev"));
@@ -36,10 +34,20 @@ app.use(limiter);
 app.use(
   cors({
     // origin: "*",
-    origin: ["http://localhost:5173", "https://insighta-web-mu-two.vercel.app/"],
+    origin: ["http://localhost:5173", "https://insighta-web-mu-two.vercel.app"],
     credentials: true,
   })
 );
+
+app.options("*", cors())
+
+// security header
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+  })
+);
+
 
 // Middleware
 app.use(cookieParser());

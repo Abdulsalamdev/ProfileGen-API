@@ -12,7 +12,7 @@ const {
   githubCallback,
   getMe
 } = require("../controllers/authController");
-const csrfProtection = require("../middleware/csrf");
+// const csrfProtection = require("../middleware/csrf");
 
 router.post("/login", login);
 router.post("/refresh", refresh);
