@@ -129,6 +129,11 @@ exports.logout = async (req, res) => {
         secure: true,
         sameSite: "none",
       })
+      .clearCookie("pkce_code_verifier", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      })
       .status(200)
       .json({
         status: "success",
