@@ -153,6 +153,12 @@ exports.githubLogin = async (req, res) => {
   try {
     let { code_challenge, state } = req.query;
 
+    const isCLI = state === "cli";
+
+    if (isCLI) {
+      return res.redirect(`http://localhost:5174/callback?code=${code}`);
+    }
+
     // fallback for testing / browser
     if (!code_challenge) {
       code_challenge = "test_challenge";
@@ -335,7 +341,7 @@ exports.getMe = async (req, res) => {
       });
     }
 
-     res.set("Cache-Control", "no-store"); 
+    res.set("Cache-Control", "no-store");
     res.json({
       status: "success",
       data: {
@@ -348,5 +354,79 @@ exports.getMe = async (req, res) => {
       status: "error",
       message: "Failed to fetch user",
     });
+  }
+};
+
+exports.cliExchange = async (req, res) => {
+  try {
+    const { code, code_verifier } = req.body;
+
+    if (!code || !code_verifier) {
+      return res.status(400).json({
+        error: "Missing code or verifier",
+      });
+    }
+
+    const redirectUri =
+      process.env.NODE_ENV === "production"
+        ? process.env.GITHUB_REDIRECT_URI_PROD
+        : process.env.GITHUB_REDIRECT_URI_LOCAL;
+
+    // exchange with GitHub
+    const tokenRes = await axios.post(
+      "https://github.com/login/oauth/access_token",
+      {
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+        redirect_uri: redirectUri,
+        code_verifier,
+      },
+      {
+        headers: { Accept: "application/json" },
+      },
+    );
+
+    const githubAccessToken = tokenRes.data.access_token;
+
+    if (!githubAccessToken) {
+      return res.status(502).json({
+        error: "Failed to get GitHub token",
+      });
+    }
+
+    // fetch user
+    const userRes = await axios.get("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${githubAccessToken}`,
+      },
+    });
+
+    const githubUser = userRes.data;
+
+    let user = await User.findOne({ github_id: githubUser.id });
+
+    if (!user) {
+      user = await User.create({
+        id: uuidv7(),
+        github_id: githubUser.id,
+        email: githubUser.email || `${githubUser.login}@github.com`,
+        role: "analyst",
+      });
+    }
+
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    user.refresh_token = refreshToken;
+    await user.save();
+
+    return res.json({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "CLI exchange failed" });
   }
 };
