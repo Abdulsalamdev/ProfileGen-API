@@ -20,7 +20,7 @@ router.post("/logout", protect, logout);
 // GitHub OAuth
 router.get("/github", githubLogin);
 router.get("/github/callback", githubCallback);
-router.post("/auth/cli/exchange", cliExchange)
+router.post("/cli/exchange", cliExchange)
 
 //  user date
 router.get("/me", protect, getMe);
