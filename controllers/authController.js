@@ -155,32 +155,34 @@ exports.githubLogin = async (req, res) => {
 
     const isCLI = state === "cli";
 
+    // 🔥 IMPORTANT FIX
+    let finalChallenge;
+
     if (isCLI) {
-      return res.redirect(`http://localhost:5174/callback?code=${code}`);
+      if (!code_challenge) {
+        return res.status(400).json({
+          status: "error",
+          message: "Missing code_challenge for CLI",
+        });
+      }
+
+      finalChallenge = code_challenge; // E
+    } else {
+      //  WEB FLOW
+      const codeVerifier = crypto.randomBytes(32).toString("hex");
+
+      finalChallenge = crypto
+        .createHash("sha256")
+        .update(codeVerifier)
+        .digest("base64url");
+
+      res.cookie("pkce_code_verifier", codeVerifier, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      });
     }
 
-    // fallback for testing / browser
-    if (!code_challenge) {
-      code_challenge = "test_challenge";
-    }
-
-    if (!state) {
-      state = "insighta_state";
-    }
-
-    const codeVerifier = crypto.randomBytes(32).toString("hex");
-
-    const codeChallenge = crypto
-      .createHash("sha256")
-      .update(codeVerifier)
-      .digest("base64url");
-
-    // Store verifier in cookie (IMPORTANT)
-    res.cookie("pkce_code_verifier", codeVerifier, {
-      httpOnly: true,
-      secure: true, // true in production (HTTPS)
-      sameSite: "none",
-    });
     const redirectUri =
       process.env.NODE_ENV === "production"
         ? process.env.GITHUB_REDIRECT_URI_PROD
@@ -191,26 +193,34 @@ exports.githubLogin = async (req, res) => {
       redirect_uri: redirectUri,
       scope: "read:user user:email",
       state,
-      code_challenge: codeChallenge,
+      code_challenge: finalChallenge,
       code_challenge_method: "S256",
     });
 
-    const githubAuthURL = `https://github.com/login/oauth/authorize?${params.toString()}`;
-
-    return res.redirect(githubAuthURL);
+    return res.redirect(
+      `https://github.com/login/oauth/authorize?${params.toString()}`,
+    );
   } catch (err) {
+    console.error(err);
     return res.status(500).json({
       status: "error",
       message: "OAuth initiation failed",
     });
   }
 };
-// github callback endpoint
 
+// github callback endpoint
 exports.githubCallback = async (req, res) => {
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
 
+    const isCLI = state === "cli";
+
+    if (isCLI) {
+      return res.redirect(`http://localhost:5174/callback?code=${code}`);
+    }
+
+    
     if (!code) {
       return res.status(400).json({
         status: "error",
