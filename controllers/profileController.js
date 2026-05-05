@@ -1,6 +1,10 @@
 const Profile = require("../models/Profile");
 const { v7: uuidv7 } = require("uuid");
 const { Parser } = require("json2csv");
+const redisClient = require("../config/redis");
+const normalizeFilter = require("../utils/normalizeFilter");
+const fs = require("fs");
+const csv = require("csv-parser");
 
 function getAgeGroup(age) {
   if (age <= 12) return "child";
@@ -138,17 +142,41 @@ exports.getAllProfiles = async (req, res) => {
       sort = { [sort_by]: order === "desc" ? -1 : 1 };
     }
 
-    const total = await Profile.countDocuments(filter);
-    const data = await Profile.find(filter).sort(sort).skip(skip).limit(limit);
+    // CACHE KEY
+    const cacheKey =
+      "profiles:" +
+      normalizeFilter(filter, { sort_by, order, page, limit });
 
-    return res.status(200).json({
+    // CHECK CACHE
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(JSON.parse(cached));
+    }
+
+    //  DB QUERY
+    const total = await Profile.countDocuments(filter);
+    const data = await Profile.find(filter)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const response = {
       status: "success",
       page,
       limit,
       total,
       data,
+    };
+
+    // STORE CACHE
+    await redisClient.set(cacheKey, JSON.stringify(response), {
+      EX: 60,
     });
+
+    return res.status(200).json(response);
   } catch (err) {
+    console.error(err);
     return res.status(500).json({
       status: "error",
       message: "Internal server error",
@@ -186,33 +214,27 @@ exports.searchProfiles = async (req, res) => {
 
     let filter = {};
 
-    // gender (handle multiple)
     if (q.includes("male") && q.includes("female")) {
-      // no filter (both allowed)
     } else if (q.includes("male")) {
       filter.gender = "male";
     } else if (q.includes("female")) {
       filter.gender = "female";
     }
 
-    // age group
     if (q.includes("child")) filter.age_group = "child";
     if (q.includes("teen")) filter.age_group = "teenager";
     if (q.includes("adult")) filter.age_group = "adult";
     if (q.includes("senior")) filter.age_group = "senior";
 
-    // young override
     if (q.includes("young")) {
       filter.age = { $gte: 16, $lte: 24 };
     }
 
-    // above X
     const aboveMatch = q.match(/above (\d+)/);
     if (aboveMatch) {
       filter.age = { $gte: Number(aboveMatch[1]) };
     }
 
-    // country
     const countries = {
       nigeria: "NG",
       kenya: "KE",
@@ -231,18 +253,36 @@ exports.searchProfiles = async (req, res) => {
       });
     }
 
-    const total = await Profile.countDocuments(filter);
-    const data = await Profile.find(filter).skip(skip).limit(limit);
+    // 🔥 CACHE KEY
+    const cacheKey =
+      "search:" + normalizeFilter(filter, { page, limit });
 
-    return res.status(200).json({
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(JSON.parse(cached));
+    }
+
+    const total = await Profile.countDocuments(filter);
+    const data = await Profile.find(filter)
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const response = {
       status: "success",
       page,
       limit,
       total,
       data,
+    };
+
+    await redisClient.set(cacheKey, JSON.stringify(response), {
+      EX: 60,
     });
 
+    return res.status(200).json(response);
   } catch (err) {
+    console.error(err);
     return res.status(500).json({
       status: "error",
       message: "Internal server error",
@@ -250,10 +290,9 @@ exports.searchProfiles = async (req, res) => {
   }
 };
 
-
 exports.exportProfiles = async (req, res) => {
   try {
-    const profiles = await Profile.find({}).lean(); // ✅ FIX
+    const profiles = await Profile.find({}).lean(); // FIX
 
     if (!profiles.length) {
       return res.status(404).json({
@@ -287,6 +326,142 @@ exports.exportProfiles = async (req, res) => {
     return res.status(500).json({
       status: "error",
       message: "Failed to export CSV",
+    });
+  }
+};
+
+exports.uploadProfiles = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        status: "error",
+        message: "No file uploaded",
+      });
+    }
+
+    const filePath = req.file.path;
+
+    const BATCH_SIZE = 1000;
+    let batch = [];
+
+    let stats = {
+      total_rows: 0,
+      inserted: 0,
+      skipped: 0,
+      reasons: {
+        duplicate_name: 0,
+        invalid_age: 0,
+        missing_fields: 0,
+        malformed: 0,
+        invalid_gender: 0,
+      },
+    };
+
+    // ✅ validation
+    function validateRow(row) {
+      if (!row.name || !row.age || !row.gender || !row.country_id) {
+        stats.reasons.missing_fields++;
+        return false;
+      }
+
+      if (isNaN(row.age) || Number(row.age) < 0) {
+        stats.reasons.invalid_age++;
+        return false;
+      }
+
+      if (!["male", "female"].includes(row.gender.toLowerCase())) {
+        stats.reasons.invalid_gender++;
+        return false;
+      }
+
+      return true;
+    }
+
+    // ✅ batch insert
+    async function insertBatch(batch) {
+      try {
+        const docs = batch.map((row) => ({
+          id: uuidv7(),
+          name: row.name.toLowerCase().trim(),
+          gender: row.gender.toLowerCase(),
+          gender_probability: Number(row.gender_probability) || 1,
+          age: Number(row.age),
+          age_group: getAgeGroup(Number(row.age)),
+          country_id: row.country_id.toUpperCase(),
+          country_name: row.country_name || "Unknown",
+          country_probability: Number(row.country_probability) || 1,
+          created_at: new Date(),
+        }));
+
+        const result = await Profile.insertMany(docs, {
+          ordered: false, // 🔥 allows partial success
+        });
+
+        stats.inserted += result.length;
+      } catch (err) {
+        if (err.writeErrors) {
+          stats.skipped += err.writeErrors.length;
+          stats.reasons.duplicate_name += err.writeErrors.length;
+        } else {
+          console.error("Batch error:", err);
+        }
+      }
+    }
+
+    // 🔥 sequential processing (safe for async)
+    let processing = Promise.resolve();
+
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on("data", (row) => {
+        stats.total_rows++;
+
+        processing = processing.then(async () => {
+          try {
+            if (!validateRow(row)) {
+              stats.skipped++;
+              return;
+            }
+
+            batch.push(row);
+
+            if (batch.length >= BATCH_SIZE) {
+              await insertBatch(batch);
+              batch = [];
+            }
+          } catch (err) {
+            stats.skipped++;
+            stats.reasons.malformed++;
+          }
+        });
+      })
+      .on("end", async () => {
+        await processing;
+
+        if (batch.length) {
+          await insertBatch(batch);
+        }
+
+        fs.unlinkSync(filePath); // cleanup
+
+        return res.status(200).json({
+          status: "success",
+          ...stats,
+        });
+      })
+      .on("error", (err) => {
+        console.error(err);
+        return res.status(500).json({
+          status: "error",
+          message: "CSV processing failed",
+        });
+      });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      status: "error",
+      message: "Internal server error",
     });
   }
 };
