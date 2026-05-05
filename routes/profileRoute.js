@@ -7,11 +7,13 @@ const {
   getAllProfiles,
   deleteProfile,
   searchProfiles,
-  exportProfiles
+  exportProfiles,
+  uploadProfiles
 } = require("../controllers/profileController");
 
 const { protect } = require("../middleware/authMiddleware");
 const authorize = require("../middleware/roleMiddleware");
+const upload = require("../middleware/upload");
 
 // Create profile
 router.post("/",protect,createProfile);
@@ -29,6 +31,9 @@ router.get(
   authorize("admin"),
   exportProfiles
 );
+
+// upload profiles via CSV
+router.post("/upload", protect, upload.single("file"), uploadProfiles);
 
 // Get single profile
 router.get("/:id", getProfile);
